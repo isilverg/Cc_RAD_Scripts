@@ -1,2 +1,2 @@
 Folder contains all scripts used to demultiplex raw reads, check quality, align samples to the loggerhead genome, and remove duplicates. 
-When possible, some outputs are included: multiqc, flagstat files for RMD of quality and coverage
+When possible, some outputs are included.
