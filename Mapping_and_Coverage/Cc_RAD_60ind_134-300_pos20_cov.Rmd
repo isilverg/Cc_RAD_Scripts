@@ -1,0 +1,202 @@
+---
+title: "Cc_RAD_60ind_134-300bp_pos20_cov"
+output: html_document
+date: '2023-01-09'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-packages, echo=FALSE, include=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(data.table)
+library(ggpubr)
+library(ggsci)
+library(reshape2)
+setwd("./")
+```
+
+```{r load-cc-data, echo=FALSE, include=FALSE}
+#read in raw seq data
+datarenamed<-read.table("linecount_bysample.txt", header=F, sep="") #read in the line counts file you generated in Step 3 of workflow, using the raw data
+colnames(datarenamed)<-c("No_seq","sample") #rename columns to be number of sequences and sample name
+datarenamed$No_seq<-datarenamed$No_seq/4 #line counts in file need to be divided by 4 since each sequence has 4 lines in fastq files- this gives true number of reads
+datarenamed$log_No_seqs<-log(datarenamed$No_seq) #get log transformed number of seqs
+vars<-colsplit(datarenamed$sample,"_",c("LabID","well","turtle", "location","seq_direction")) #separate sample name by metadata factors that are in the name of your sample- CHANGE THIS FOR YOUR DATA
+datarenamed<-cbind(vars,datarenamed)#combine seq info with metadata info
+samplesonly<-subset(datarenamed,LabID != "total")
+sample.reads.binRA<-subset(samplesonly,seq_direction=="RA.fastq")
+
+#Read in data
+data1<-read.table("./All.combined.pos20.2.bed", header=FALSE) #this is the output of upstream bedtools and bash code (see hackMD)
+#metadata<-read.csv("GT_HI_metadata.csv") #change accordingly
+
+#Reformatting
+names(data1)<-c("scaffold", "position","coverage","sampleID")
+data1$sampleID<-gsub("RAD-CCGOM_","",data1$sampleID)#change text accordingly
+data1$sampleID<-gsub(".pos20.cov.txt","",data1$sampleID)
+data2<-data1 %>%
+  separate(sampleID, c("well", "turtle", "location"), sep="_")#change column labels accordingly
+data2$locus<-paste(data2$scaffold, data2$position, sep="-")
+data2<-data2[,c(7,3:6)]#change columns to keep accordingly
+pal<-get_palette(palette = "Set3", 12)
+```
+
+```{r summary-stats, echo=FALSE, include=FALSE}
+data2$well<-factor(data2$well)
+data2<-subset(data2,well!="wC03")
+data2<-subset(data2,well!="wE04")
+mean.cov<-tapply(data2$coverage,data2$well,mean)
+sd.cov<-tapply(data2$coverage,data2$well,sd)
+median.cov<-tapply(data2$coverage,data2$well,median)
+summary<-data.frame(mean.cov,sd.cov,median.cov)
+summary$well<-row.names(summary)
+summary2<-merge(summary,sample.reads.binRA)
+```
+\
+Histogram of Mean Coverage\
+```{r mean-cov, echo=FALSE}
+hist(summary2$mean.cov, ylab="Mean Coverage")
+```
+\
+Summary of Mean Coverage\
+Failed Samples Removed\
+```{r summary-mean-cov, echo=FALSE}
+summary(summary2$mean.cov)
+```
+\
+Plot of Mean Coverage x # of Seqs\
+```{r seq-cov, echo=FALSE}
+ggplot(summary2,aes(x=No_seq,y=mean.cov))+geom_point()
+```
+\
+Boxplot of Coverage by Well\
+```{r box-cov-well, echo=FALSE}
+ggplot(data2,aes(x = well, y = coverage))+
+  geom_boxplot()+
+  ylim(0,100)
+```
+\
+Barplot of Coverage by Well\
+Color = Location\
+Failed Samples (<10,000 seqs) Excluded\
+```{r bar-cov-well-loc, echo=FALSE}
+summary3<-subset(summary2,No_seq>=10000)
+ggbarplot(summary3,x = "well", y = "mean.cov", fill = "location",
+          palette = pal, orientation = "vert", xlab = "Well", 
+          ylab = "Mean depth coverage (X)") +
+  geom_errorbar(aes(ymin=mean.cov-sd.cov, ymax=mean.cov+sd.cov), width=.2,position=position_dodge(.9)) +theme(axis.text.x = element_text(size=8)) + rotate_x_text(angle = 90)
+#tweak above for writing to output, and add additional graphs by other factors as desired, etc
+```
+\
+Boxplot of Mean Coverage by Location\
+```{r box-cov-loc, echo=FALSE}
+summary3%>%
+  ggplot(aes(x=location, y=mean.cov, fill=location))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Mean Coverage")+
+  xlab("Location")
+```
+\
+Mean Coverage Per Locus\
+```{r mean-cov-loc, echo=FALSE}
+locus.mean<-tapply(data2$coverage,data2$locus,mean)
+locus.sd<-tapply(data2$coverage,data2$locus,sd)
+summaryL<-data.frame(locus.mean,locus.sd)
+summaryL$locus<-row.names(summaryL)
+hist(summaryL$locus.mean, breaks="Scott",xlim=c(0,50))
+```
+\
+Mean Coverage Per Locus (>10X)
+```{r sub-loc-10x, echo=FALSE}
+summaryL10<-subset(summaryL, locus.mean>=10)
+print("Total # of loci with >= 10X coverage:")
+print(length(summaryL10$locus))
+```
+\
+\
+```{r loc10-hist, echo=FALSE}
+hist(summaryL10$locus.mean, breaks="Scott",xlim=c(10,50))
+```
+\
+Boxplot of # Loci with >10X Coverage by Location
+```{r loci-10-loc, echo=FALSE}
+data3<-subset(data2, coverage>=10)
+locuscount<-data3 %>%
+  count(locus, location)
+locuscount%>%
+  ggplot(aes(x=location, y=n, fill=location))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Individuals per Locus")+
+  xlab("Location")
+```
+\
+Number of Loci with 10X Coverage and 15 individuals per population
+```{r loc-per-pop-ind-15, echo=FALSE}
+locuscount15<-subset(locuscount, n>=15)
+locuscount15ngm<-subset(locuscount15, location=="NGM")
+colnames(locuscount15ngm)<-c("locus", "locationngm", "nngm")
+print("Loci with 10X + >=15 Ind for NGM:")
+length(locuscount15ngm$locus)
+locuscount15cwfl<-subset(locuscount15, location=="CWFL")
+colnames(locuscount15cwfl)<-c("locus", "locationcwfl", "ncwfl")
+print("Loci with 10X + >=15 Ind for CWFL:")
+length(locuscount15cwfl$locus)
+locuscount15swfl<-subset(locuscount15, location=="SWFL")
+colnames(locuscount15swfl)<-c("locus", "locationswfl", "nswfl")
+print("Loci with 10X + >=15 Ind for SWFL:")
+length(locuscount15swfl$locus)
+locuscount15drto<-subset(locuscount15, location=="DRTO")
+colnames(locuscount15drto)<-c("locus", "locationdrto", "ndrto")
+print("Loci with 10X + >=15 Ind for DRTO:")
+length(locuscount15drto$locus)
+sharedloci15<-merge(locuscount15ngm, locuscount15cwfl, by=c("locus"), all=F)
+sharedloci15<-merge(sharedloci15, locuscount15drto, by=c("locus"), all=F)
+sharedloci15<-merge(sharedloci15, locuscount15swfl, by=c("locus"), all=F)
+print("# of loci with 10X and >=15 ind shared among all 4 locations:")
+length(sharedloci15$locus)
+```
+\
+Number of Loci with 10X Coverage and 10 individuals per population
+```{r loc-per-pop-ind-10, echo=FALSE}
+locuscount10<-subset(locuscount, n>=10)
+locuscount10ngm<-subset(locuscount10, location=="NGM")
+colnames(locuscount10ngm)<-c("locus", "locationngm", "nngm")
+print("Loci with 10X + >=10 Ind for NGM:")
+length(locuscount10ngm$locus)
+locuscount10cwfl<-subset(locuscount10, location=="CWFL")
+colnames(locuscount10cwfl)<-c("locus", "locationcwfl", "ncwfl")
+print("Loci with 10X + >=10 Ind for CWFL:")
+length(locuscount10cwfl$locus)
+locuscount10swfl<-subset(locuscount10, location=="SWFL")
+colnames(locuscount10swfl)<-c("locus", "locationswfl", "nswfl")
+print("Loci with 10X + >=10 Ind for SWFL:")
+length(locuscount10swfl$locus)
+locuscount10drto<-subset(locuscount10, location=="DRTO")
+colnames(locuscount10drto)<-c("locus", "locationdrto", "ndrto")
+print("Loci with 10X + >=10 Ind for DRTO:")
+length(locuscount10drto$locus)
+sharedloci10<-merge(locuscount10ngm, locuscount10cwfl, by=c("locus"), all=F)
+sharedloci10<-merge(sharedloci10, locuscount10drto, by=c("locus"), all=F)
+sharedloci10<-merge(sharedloci10, locuscount10swfl, by=c("locus"), all=F)
+print("# of loci with 10X and >=10 ind shared among all 4 locations:")
+length(sharedloci10$locus)
+```
+\
+Mean Coverage Per Locus (>20X)
+```{r sub-loc-20x, echo=FALSE}
+summaryL20<-subset(summaryL10, locus.mean>=20)
+print("Total # of loci with >= 20X coverage:")
+print(length(summaryL20$locus))
+```
+\
+\
+```{r loc20-hist, echo=FALSE}
+hist(summaryL20$locus.mean, breaks="Scott",xlim=c(20,50))
+```

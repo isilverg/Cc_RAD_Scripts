@@ -1,0 +1,187 @@
+---
+title: "Cc_RAD"
+output: html_document
+date: '2022-09-01'
+---
+### RAD Initial QA
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r load-packages, echo=FALSE, include=FALSE}
+library(here)
+list.files()
+library(ggplot2)
+library(tidyr)
+library(data.table)
+library(reshape2)
+```
+```{r load-cc-data, echo=FALSE, include=FALSE}
+cc_datarenamed<-read.table("linecount_bysample.txt", header=F, sep="") #read in the line counts file you generated in Step 3 of workflow, using the raw data
+colnames(cc_datarenamed)<-c("No_seq","sample") #rename columns to be number of sequences and sample name
+cc_datarenamed$No_seq<-cc_datarenamed$No_seq/4 #line counts in file need to be divided by 4 since each sequence has 4 lines in fastq files- this gives true number of reads
+cc_datarenamed$log_No_seqs<-log(cc_datarenamed$No_seq) #get log transformed number of seqs
+cc_vars<-colsplit(cc_datarenamed$sample,"_",c("LabID","well","turtle", "loc","seq_direction")) #separate sample name by metadata factors that are in the name of your sample- CHANGE THIS FOR YOUR DATA
+cc_datarenamed<-cbind(cc_vars,cc_datarenamed)#combine seq info with metadata info
+
+cc_samplesonly<-subset(cc_datarenamed,LabID != "total") # remove line at the end of your file that has total count of all sequences, if you have blank wells you also need to remove these to look at them separately here, so could add !="BLANK" in addition
+levels(cc_samplesonly$LabID<-factor(cc_samplesonly$LabID))#double check for typos in categories
+levels(cc_samplesonly$turtle<-factor(cc_samplesonly$turtle))#double check for typos in categories
+levels(cc_samplesonly$loc<-factor(cc_samplesonly$loc))#double check for typos in categories
+levels(cc_samplesonly$well<-factor(cc_samplesonly$well))#double check for typos in categories
+levels(cc_samplesonly$seq_direction<-factor(cc_samplesonly$seq_direction))#double check for typos in categories
+```
+
+##Cc GoM
+#Cc Summary Stats for Read #s
+```{r summary-for-Cc, echo=FALSE}
+cc_mean<-tapply(cc_samplesonly$No_seq, cc_samplesonly$LabID,mean) #if you did not subset to remove empty wells , then you can do this for the object "datarenamed" instead of "samplesonly". I do this by species since this plate only has ONE species so this will include ALL samples in plate
+cc_min<-tapply(cc_samplesonly$No_seq, cc_samplesonly$LabID,min)
+cc_max<-tapply(cc_samplesonly$No_seq, cc_samplesonly$LabID,max)
+cc_median<-tapply(cc_samplesonly$No_seq, cc_samplesonly$LabID,median)
+cc_summary_by_plate<-data.frame(cc_mean,cc_median,cc_min,cc_max)
+cc_summary_by_plate
+```
+
+#Cc Histograms of Raw Reads: All Reads\
+```{r Cc-all-raw-reads, echo=FALSE}
+cc_sample.reads.bin<-cc_samplesonly #from above
+cc_sample.reads.binRA<-subset(cc_sample.reads.bin,seq_direction=="RA.fastq") #subset out only forward reads
+cc_sample.reads.binRA$Bin_seq <- ifelse(cc_sample.reads.binRA$No_seq <= 10000, 10000, ifelse((cc_sample.reads.binRA$No_seq >10000) & (cc_sample.reads.binRA$No_seq < 100000), cc_sample.reads.binRA$No_seq, 100000)) #bin samples 
+ggplot(cc_sample.reads.binRA, aes(x=Bin_seq)) +
+  geom_histogram(colour="black", fill="blue",binwidth = 10000) +theme_bw()+
+  facet_wrap(~LabID,scales="free")
+```
+
+\
+#Cc Histograms of Raw Reads: Low (<100,000) Reads\
+```{r Cc-failed-reads, echo=FALSE}
+cc_sample.reads.binRA$QC_cat <- ifelse(cc_sample.reads.binRA$No_seq <= 10000, "failed", ifelse((cc_sample.reads.binRA$No_seq >10000) & (cc_sample.reads.binRA$No_seq <= 100000), "good", "high")) #add in column for qc metric
+cc_sample.reads.binRAshort<-cc_sample.reads.binRA
+cc_sample.reads.binRAshort$Bin_seqlow<-ifelse(cc_sample.reads.binRAshort$No_seq <= 20000, cc_sample.reads.binRAshort$No_seq, 20000)#bin everything high to be able to look at low distribution and confirm we think 10K is reasonable cutoff for pass/fail
+ggplot(cc_sample.reads.binRAshort, aes(x=Bin_seqlow)) +
+  geom_histogram(colour="black", fill="blue",binwidth = 1000) +theme_bw()+
+  facet_wrap(~LabID,scales="free")
+```
+\
+#Cc Failed Reads Summary By Location, Turtle ID, and Well\
+```{r cc-failed-reads-summary, echo=FALSE}
+cc_failed<-subset(cc_sample.reads.binRAshort, QC_cat=="failed")
+#table(cc_failed$well)
+table(cc_failed$loc)
+unique(cc_failed$turtle)
+unique(cc_failed$well) #wells with failed samples print on top
+cc_qc_pass<-subset(cc_sample.reads.binRAshort, QC_cat!="failed")
+```
+
+```{r cc-failed-reads-plots, echo=FALSE}
+#str(cc_failed)
+cc_failed$loc<-as.factor(cc_failed$loc)#change text categories to factors for plotting
+```
+\
+\
+\
+#Cc Failed Reads Plots by Location and Well\
+```{r cc-failed-reads-plots-2, echo=FALSE}
+plot(cc_failed$loc,cc_failed$No_seq,las=2, ylab="# Seqs", xlab="Location") #plot by metadata component 1 (e.g. location, year)
+plot(cc_failed$well,cc_failed$No_seq,las=2, ylab="# Seqs", xlab="Well") #plot by RAD plate well
+```
+
+```{r  cc-summary-by-loc, echo=FALSE, include=FALSE}
+cc_mean<-tapply(cc_samplesonly$No_seq, cc_samplesonly$loc,mean) #if you did not subset to remove empty wells in line 50, then do this for the object "datarenamed" instead of "samplesonly"
+cc_min<-tapply(cc_samplesonly$No_seq, cc_samplesonly$loc,min)
+cc_max<-tapply(cc_samplesonly$No_seq, cc_samplesonly$loc,max)
+cc_median<-tapply(cc_samplesonly$No_seq, cc_samplesonly$loc,median)
+cc_summary_by_loc<-data.frame(cc_mean,cc_median,cc_min,cc_max) #get summary by metadata factor, here using location
+cc_samplesonly$loc<-as.factor(cc_samplesonly$loc)#change character strings to factors for plotting
+```
+\
+#Cc All Reads by Loction\
+```{r plot-all-cc-reads-loc, echo=FALSE}
+plot(cc_samplesonly$loc,cc_samplesonly$No_seq,las=2, ylab="# Seqs", xlab="Location") #plot number sequences by location
+cc_qc_pass$loc<-as.factor(cc_qc_pass$loc)
+```
+\
+#Cc Passed Reads by Location\
+```{r plot-all-cc-reads-loc-2, echo=FALSE}
+plot(cc_qc_pass$loc,cc_qc_pass$No_seq,ylab="# Seqs", xlab="Location") #plotting number sequences by location with failed samples removed
+```
+\
+#Cc Summary of Passed Reads by Location\
+```{r plot-passing-cc-reads-loc, echo=FALSE}
+cc_mean<-tapply(cc_qc_pass$No_seq, cc_qc_pass$loc,mean) #if you did not subset to remove empty wells in line 50, then do this for the object "datarenamed" instead of "samplesonly"
+cc_min<-tapply(cc_qc_pass$No_seq, cc_qc_pass$loc,min)
+cc_max<-tapply(cc_qc_pass$No_seq, cc_qc_pass$loc,max)
+cc_median<-tapply(cc_qc_pass$No_seq, cc_qc_pass$loc,median)
+cc_summary_by_loc<-data.frame(cc_mean,cc_median,cc_min,cc_max)
+cc_summary_by_loc
+```
+\
+#Cc log(Reads) by Location\
+```{r plot-passing-cc-reads-loc-2, echo=FALSE}
+plot(cc_samplesonly$loc,cc_samplesonly$log_No_seqs,las=2,ylab="log(Reads)", xlab="Location")
+```
+\
+#Cc Reads by Well\
+```{r cc-reads-by-well, echo=FALSE}
+plot(cc_samplesonly$well,cc_samplesonly$No_seq,las=2, ylab="Reads", xlab="well")
+```
+\
+#Cc Alignment and Filtering QA\
+```{r cc-format-bwafilt-data, echo=FALSE}
+cc_mapped.raw<-read.delim("./All_head_flagstat_reformat.txt",header=T) #read in file generated after mapping
+cc_mapped.fltr<-read.delim("./All_head_filt_flagstat_reformat.txt",header=T) #read in file generated after removing PCR dups
+cc_mapped.raw$ID<-gsub("_sort_flagstat.txt", "", cc_mapped.raw$sampleID)
+cc_mapped.fltr$ID<-gsub("_sortfltr_flagstat.txt", "", cc_mapped.fltr$sampleID)
+cc_mapped.comb<-merge(cc_mapped.raw,cc_mapped.fltr, by="ID") #make one dataframe with both mapped read types
+cc_mapped.comb<-cc_mapped.comb[,c(1,3,15,4,16,5,17,6,18,7,19,8,20,9,21,10,22,11,23,12,24,13,25)] #reorganize dataframe, this can be changed if needed, but this column format generally works
+cc_vars<-colsplit(cc_mapped.comb$ID, "_", c("LABID","well","turtle","loc")) #the options after c() will be specifiy to your naming scheme for your samples, CHANGE FOR YOUR DATA
+cc_mapped.comb<-cbind(cc_mapped.comb,cc_vars)
+cc_mapped.comb<-cc_mapped.comb[,c(1,24:27,2:23)] #tidy up
+```
+
+```{r cc-duplicate-reads, echo=FALSE}
+cc_mapped.comb$prop.NDreads<-cc_mapped.comb$mapped.reads.QC.passed.y/cc_mapped.comb$total.reads.QC.passed.x
+```
+\
+#Cc Summary and SD of Proportion of Non Duplicate Reads
+```{r cc-duplicate-reads-1, echo=FALSE}
+##Proportion of Non Duplicate Reads
+summary(cc_mapped.comb$prop.NDreads)#see percentage of raw reads left after filtering
+##SD of Proportion of Non Duplicate Reads
+sd(cc_mapped.comb$prop.NDreads) #get sd of how many reads are dropped to filtering
+```
+\
+#Cc Proportion of Non Duplicate Reads
+```{r cc-duplicate-reads-1-1, echo=FALSE}
+##Histogram of Proportion of Non Duplicated Reads
+hist(cc_mapped.comb$prop.NDreads, xlab="# Non Duplicate Reads") #plot histogram of prop of nonduplicated reads
+```
+```{r cc-duplicated-reads-2, echo=FALSE}
+cc_mapped.comb$prop.dupreads<-(1-cc_mapped.comb$prop.NDreads) #get proportion of reads that were duplicates
+```
+\
+#Cc Summary and SD of Duplicate Reads
+```{r cc-duplicated-reads-3, echo=FALSE}
+##Proportion of Duplicated Reads
+summary(cc_mapped.comb$prop.dupreads)
+#SD of Proportion of Duplicated Reads
+sd(cc_mapped.comb$prop.dupreads)
+```
+\
+#Cc Proportion of Duplicate Reads\
+```{r cc-duplicated-reads-3-1, echo=FALSE}
+#Histogram of Porportion of Duplicated Reads
+hist(cc_mapped.comb$prop.dupreads, ylab="Frequency", xlab="% Duplicate Reads")
+```
+
+```{r cc-percent-reads-mapped, echo=FALSE, include=FALSE}
+cc_mapped.comb.short<-cc_mapped.comb[,c(1:12,29)] #create shorter version of he above dataframe
+str(cc_mapped.comb.short)
+names(cc_mapped.comb.short) <- c("ID", "LABID","well", "turtle", "loc", "UF_total_reads_QC_passed"	,"F_total_reads_QC_passed","UF_mapped_reads_QC_passed","F_mapped_reads_QC_passed",	"UF_percent_reads_mapped","F_percent_reads_mapped","prop") #you should change some of these if the variables aren't in your dataset, like mpatch
+```
+\
+##Cc percent reads mapped\
+```{r cc-percent-reads-mapped-1, echo=FALSE}
+hist(cc_mapped.comb.short$F_percent_reads_mapped, xlab="% Filtered Reads Mapped")
+write.csv(cc_mapped.comb.short,"./short_mapping_stats.csv") #change path to where you want your mapping stat file written to
+```
