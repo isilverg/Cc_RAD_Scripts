@@ -1,1 +1,0 @@
-mv ../1_raw_fastq/CC_RA/RAD-CCGOM_RA_GGGCCAAGACTGCAGG.fastq ../2_demultiplexed_renamed_fastq/RAD-CCGOM_wH12_KEY431_SWFL_RA.fastq
