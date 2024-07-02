@@ -1,0 +1,1380 @@
+---
+title: "Loggerhead Sea Turtle SNP Outlier Loci/GSI"
+output:
+  html_document: default
+  word_document: default
+date: "2024-2-12"
+---
+## Project Description
+  Sea turtles, especially females, exhibit natal homing for reproduction. Mitochondrial control region 
+  haplotypes sequenced from nesting females have therefore been used extensively to identify 
+  demographically independent populations of sea turtles. This has led to the delineation of turtles 
+  nesting along contiguous stretches of coastline into genetically discrete Management Units (MUs). In 
+  some cases MUs differ only in the frequencies of shared haplotypes, which may be due to recent 
+  colonization or to contemporary connectivity between MUs (which would imply limited demographic 
+  independence between MUs). Microsatellite loci have been used to further examine structuring and 
+  connectivity between MUs, and sometimes do not show any structuring between MUs. This may be due to 
+  male mediated gene flow, as mating occurs offshore and males may either travel between MUs to breed or 
+  may intercept females as they undertake reproductive migrations. It is also possible that 
+  microsatellite loci may not reflect demographic independence between recently established populations 
+  that have not yet reached migration-drift equilibrium. Genome-wide SNPs might serve as a useful 
+  additional line of evidence to help understand genetic similarity between MUs, but no studies have 
+  examined genome-wide SNP data between established sea turtle MUs. Further, as sea turtles spend much of
+  their lives dispersed from reproductive areas, it would be highly informative to be able to conduct 
+  accurate GSI of at sea or bycaught individuals to MUs. This is not possible when MUs exhibit high 
+  genetic similarity in traditional genetic markers. If genome-wide SNPs reflect genetic structuring 
+  between MUs, they may also be useful for accurate GSI.
+  
+  We explored the utility of genome-wide SNPs to characterize structuring between MUs, and for GSI, in 
+  the four MUs for loggerhead sea turtles in the Gulf of Mexico. These MUs are differentiated by 
+  haplotype frequencies from females nesting at one to two proxy sites within each MU. Microsatellites 
+  exhibit no genetic structuring between these MUs. We generated genome-wide SNP data (n=30,776 loci 
+  after filtering) for turtles nesting at one proxy site within each MU. We found high genetic similarity
+  in multiple analyses (DAPC, STRUCTURE, Admixture, etc.), but pairwise Fst suggested extremely weak 
+  (Fst<0.001) yet significant  structuring between some MUs. Because of this, we searched for neutral 
+  outlier loci that might be informative for GSI based on allele frequency differences between pairs of 
+  MUs (following Baetscher et al. 2022). However, our sample size is low (15-18 individuals per 
+  population). 
+  
+  First, we used allele frequencies from MUs containing all sequenced individuals to identify outlier 
+  loci (n=238), and then split our sample into random training/validation data for subsequent GSI testing
+  (via DAPC and Rubias). This approach led to 100% successful reassignment, but may not reflect the true 
+  capability of genome-wide SNPs to assign previously unsampled individuals to MUs.
+  
+  Second, to mimic "true" GSI (i.e., establishing informative loci and then sampling and sequencing new 
+  individuals), we identified outlier loci using ONLY the training individuals, and then tested the 
+  ability of these loci to accurately assign the validation individuals to their MUs. This approach led 
+  to decreased reassignment accuracy of ~30-40%. Given our low sample size and weak structuring between 
+  MUs,it seems possible to us that using only the training individuals to identify outlier loci might 
+  diminish the signal of genetic structuring between MUs such that the outlier loci are not actually 
+  informative for GSI. 
+  
+  Both of these approaches towards GSI using our data are demonstrated below, and we would appreciate 
+  your input on how to interpret and proceed with these results, especially as we are actively working to
+  publish our study.
+  
+```{r setup and libraries, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+rm(list=ls())
+
+library(devtools)
+library(tidyverse)
+library(dartR) #this calls SNPrelate as a dependency, which seems to have been taken off CRAN
+library(poppr)
+library(hierfstat)
+library(vcfR)
+library(adegenet)
+library(gridExtra)
+library(ggpubr)
+library(ape)
+library(reshape2)
+library(Matrix)
+library(ggplot2)
+library(matrixStats)
+library(dplyr)
+
+```
+
+## Filtered Data
+
+```{r input data, echo=FALSE, include=FALSE}
+#setwd("C:/Users/Ian/Desktop/Dissertation/Chapter 4 Genetics/Genomics Metadata and Data/VCFTools_Out")
+##Load Raw Data and Filter Using Whitelists from Previous Steps##
+#Read in VCF file
+in_vcf <- read.vcfR("./data/Combined_filtered_normed_norels_locname_newnames_sorted.vcf", convertNA = T)
+
+#Convert vcf to genlight. Save twice: genlight.orig will be preserved if samples are subset and the genlight object will be replaced; if no subsetting is needed, then the file named genlight will be used throughout the rest of the script. 
+genlight.orig = genlight <- vcfR2genlight(in_vcf)
+```
+
+# MUs
+```{r MU popmap and check}
+
+#Read in the population map. This should be a two-column tab-delimited text file where the first column contains the name of each individual sample and the second column contains the population. This can be the same as the population map used in Stacks.
+popmap.orig <- read_tsv("./data/Combined_sort_popmap.txt", col_names = F) %>% 
+  dplyr::rename(Indiv = X1, STRATA = X2)
+
+# Filter the population map for whitelisted individuals i.e. those we will keep for the population genetics analysis.
+popmap.filtered <- tibble(Indiv = genlight@ind.names) %>% left_join(popmap.orig, by = "Indiv")
+genlight@pop <- as.factor(popmap.filtered$STRATA)
+summary(genlight@pop)
+
+# Read in a "regions" file. This file should have at a minimum a column for Population, latitude, and longitude. We assume this is a csv (comma-separate) file.
+#region <- read.csv("regions.csv", header = T)
+
+#Tibbles will only show a couple sig digits for lat and long, but the full coordinates are stored.
+#latlon <- as.data.frame(cbind(region$Population,
+#                              region$lat,
+#                              region$lon)) %>% 
+#  dplyr::rename(STRATA = V1, lat = V2, lon = V3) %>% 
+#  mutate(lat = as.numeric(lat), lon = as.numeric(lon))
+
+#Replicate the coordinates for each sample
+#all_latlon <- popmap.filtered %>% left_join(latlon, by = "STRATA") %>% 
+#  dplyr::select(-Indiv)
+
+#latlon <- all_latlon[,2:3]
+#genlight@other$latlon<-latlon
+
+genlight_2 <- gl.compliance.check(genlight)
+
+genind <- gl2gi(genlight_2) # need genind format for some functions
+summary(genlight_2@pop)
+summary(genind@pop)
+```
+
+```{r MU poplist for assignments}
+# Create a list of individuals for each population
+pop_names <- unique(genind$pop)
+indiv_names <- genlight_2@other[["ind.metrics"]][["id"]]
+populations <- lapply(pop_names, function(pop) indiv_names[pop == genind$pop])
+```
+
+```{r MU LOO+Loci Serial}
+# Initialize an empty list to store combinations
+combinations_list <- list()
+
+# Nested loops to iterate through each combination
+for (indiv_pop1 in populations[[1]]) {
+  for (indiv_pop2 in populations[[2]]) {
+    for (indiv_pop3 in populations[[3]]) {
+      for (indiv_pop4 in populations[[4]]) {
+        for (indiv_pop5 in populations[[5]]) {
+          for (indiv_pop6 in populations[[6]]) {
+            for (indiv_pop7 in populations[[7]]) {
+        # Create a list for the current combination
+        current_combination <- list(
+          population1 = indiv_pop1,
+          population2 = indiv_pop2,
+          population3 = indiv_pop3,
+          population4 = indiv_pop4,
+          population4 = indiv_pop5,
+          population4 = indiv_pop6,
+          population4 = indiv_pop7
+        )
+        # Append the current combination to the list of combinations
+        combinations_list <- c(combinations_list, list(current_combination))
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+n<-100
+rand_combs <- sample(combinations_list, n, replace = TRUE)
+datalist = vector("list", length = length(rand_combs))
+top_seq <- seq(from = 10, to = 1000, by = 100)
+loci_list = vector("list", length = length(top_seq))
+
+# Access and print individual names from a specific combination
+for (i in seq_along(rand_combs)) {
+  current_combination <- rand_combs[[i]]
+  individual_names <- unlist(current_combination)
+  
+  #Subset geninds
+  training_genind<- genind[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind[individual_names]
+  
+  #ID outlier loci
+  genpop<-genind2genpop(training_genind, quiet=TRUE) #change to training_genind for actual loo
+  #Calculate allele frequencies
+  freq<-makefreq(genpop, missing=0, quiet=TRUE)
+  
+  #Calculate allele frequency differences for all pairs of populations
+  freqdiffs<-list()
+  for (j in 1:(nrow(freq) - 1)) {
+    for (k in (j + 1):nrow(freq)) {
+      freqdiffs[[paste(row.names(freq)[j], row.names(freq)[k], sep = '-')]] <- abs(freq[j, ] - freq[k, ])
+   }
+  }
+  as.data.frame(do.call(rbind, freqdiffs))
+  
+  
+for (l in seq_along(top_seq)){
+  
+  n.top<-top_seq[[l]]
+  
+  # Combination 1: CEFL - NRU
+  NRU_CEFL <- as.data.frame(freqdiffs[["CEFL-NRU"]])
+  colnames(NRU_CEFL) <- "NRUCEFL"
+  NRU_CEFL$locus <- gsub("\\..*", "", rownames(NRU_CEFL))
+  NRU_CEFL <- NRU_CEFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_CEFL) <- NRU_CEFL$locus
+  NRUCEFL_top <- NRU_CEFL %>% top_n(n.top, NRUCEFL)
+  
+  # Combination 2: NRU - SEFL
+  NRU_SEFL <- as.data.frame(freqdiffs[["NRU-SEFL"]])
+  colnames(NRU_SEFL) <- "NRUSEFL"
+  NRU_SEFL$locus <- gsub("\\..*", "", rownames(NRU_SEFL))
+  NRU_SEFL <- NRU_SEFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_SEFL) <- NRU_SEFL$locus
+  NRUSEFL_top <- NRU_SEFL %>% top_n(n.top, NRUSEFL)
+  
+  # Combination 3: NRU - DRTO
+  NRU_DRTO <- as.data.frame(freqdiffs[["DRTO-NRU"]])
+  colnames(NRU_DRTO) <- "NRUDRTO"
+  NRU_DRTO$locus <- gsub("\\..*", "", rownames(NRU_DRTO))
+  NRU_DRTO <- NRU_DRTO %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_DRTO) <- NRU_DRTO$locus
+  NRUDRTO_top <- NRU_DRTO %>% top_n(n.top, NRUDRTO)
+  
+  # Combination 4: NRU - SWFL
+  NRU_SWFL <- as.data.frame(freqdiffs[["NRU-SWFL"]])
+  colnames(NRU_SWFL) <- "NRUSWFL"
+  NRU_SWFL$locus <- gsub("\\..*", "", rownames(NRU_SWFL))
+  NRU_SWFL <- NRU_SWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_SWFL) <- NRU_SWFL$locus
+  NRUSWFL_top <- NRU_SWFL %>% top_n(n.top, NRUSWFL)
+  
+  # Combination 5: NRU - CWFL
+  NRU_CWFL <- as.data.frame(freqdiffs[["CWFL-NRU"]])
+  colnames(NRU_CWFL) <- "NRUCWFL"
+  NRU_CWFL$locus <- gsub("\\..*", "", rownames(NRU_CWFL))
+  NRU_CWFL <- NRU_CWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_CWFL) <- NRU_CWFL$locus
+  NRUCWFL_top <- NRU_CWFL %>% top_n(n.top, NRUCWFL)
+  
+  # Combination 6: NRU - NGM
+  NRU_NGM <- as.data.frame(freqdiffs[["NGM-NRU"]])
+  colnames(NRU_NGM) <- "NRUNGM"
+  NRU_NGM$locus <- gsub("\\..*", "", rownames(NRU_NGM))
+  NRU_NGM <- NRU_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_NGM) <- NRU_NGM$locus
+  NRUNGM_top <- NRU_NGM %>% top_n(n.top, NRUNGM)
+  
+  # Combination 7: CEFL - SEFL
+  CEFL_SEFL <- as.data.frame(freqdiffs[["CEFL-SEFL"]])
+  colnames(CEFL_SEFL) <- "CEFLSEFL"
+  CEFL_SEFL$locus <- gsub("\\..*", "", rownames(CEFL_SEFL))
+  CEFL_SEFL <- CEFL_SEFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(CEFL_SEFL) <- CEFL_SEFL$locus
+  CEFLSEFL_top <- CEFL_SEFL %>% top_n(n.top, CEFLSEFL)
+  
+  # Combination 8: CEFL - DRTO
+  CEFL_DRTO <- as.data.frame(freqdiffs[["CEFL-DRTO"]])
+  colnames(CEFL_DRTO) <- "CEFLDRTO"
+  CEFL_DRTO$locus <- gsub("\\..*", "", rownames(CEFL_DRTO))
+  CEFL_DRTO <- CEFL_DRTO %>% distinct(locus, .keep_all = TRUE)
+  rownames(CEFL_DRTO) <- CEFL_DRTO$locus
+  CEFLDRTO_top <- CEFL_DRTO %>% top_n(n.top, CEFLDRTO)
+  
+  # Combination 9: CEFL - SWFL
+  CEFL_SWFL <- as.data.frame(freqdiffs[["CEFL-SWFL"]])
+  colnames(CEFL_SWFL) <- "CEFLSWFL"
+  CEFL_SWFL$locus <- gsub("\\..*", "", rownames(CEFL_SWFL))
+  CEFL_SWFL <- CEFL_SWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(CEFL_SWFL) <- CEFL_SWFL$locus
+  CEFLSWFL_top <- CEFL_SWFL %>% top_n(n.top, CEFLSWFL)
+  
+  # Combination 10: CEFL - CWFL
+  CEFL_CWFL <- as.data.frame(freqdiffs[["CEFL-CWFL"]])
+  colnames(CEFL_CWFL) <- "CEFLCWFL"
+  CEFL_CWFL$locus <- gsub("\\..*", "", rownames(CEFL_CWFL))
+  CEFL_CWFL <- CEFL_CWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(CEFL_CWFL) <- CEFL_CWFL$locus
+  CEFLCWFL_top <- CEFL_CWFL %>% top_n(n.top, CEFLCWFL)
+  
+  # Combination 11: CEFL - NGM
+  CEFL_NGM <- as.data.frame(freqdiffs[["CEFL-NGM"]])
+  colnames(CEFL_NGM) <- "CEFLNGM"
+  CEFL_NGM$locus <- gsub("\\..*", "", rownames(CEFL_NGM))
+  CEFL_NGM <- CEFL_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(CEFL_NGM) <- CEFL_NGM$locus
+  CEFLNGM_top <- CEFL_NGM %>% top_n(n.top, CEFLNGM)
+  
+  # Combination 12: SEFL - DRTO
+  SEFL_DRTO <- as.data.frame(freqdiffs[["DRTO-SEFL"]])
+  colnames(SEFL_DRTO) <- "SEFLDRTO"
+  SEFL_DRTO$locus <- gsub("\\..*", "", rownames(SEFL_DRTO))
+  SEFL_DRTO <- SEFL_DRTO %>% distinct(locus, .keep_all = TRUE)
+  rownames(SEFL_DRTO) <- SEFL_DRTO$locus
+  SEFLDRTO_top <- SEFL_DRTO %>% top_n(n.top, SEFLDRTO)
+  
+  # Combination 13: SEFL - SWFL
+  SEFL_SWFL <- as.data.frame(freqdiffs[["SEFL-SWFL"]])
+  colnames(SEFL_SWFL) <- "SEFLSWFL"
+  SEFL_SWFL$locus <- gsub("\\..*", "", rownames(SEFL_SWFL))
+  SEFL_SWFL <- SEFL_SWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(SEFL_SWFL) <- SEFL_SWFL$locus
+  SEFLSWFL_top <- SEFL_SWFL %>% top_n(n.top, SEFLSWFL)
+  
+  # Combination 14: SEFL - CWFL
+  SEFL_CWFL <- as.data.frame(freqdiffs[["CWFL-SEFL"]])
+  colnames(SEFL_CWFL) <- "SEFLCWFL"
+  SEFL_CWFL$locus <- gsub("\\..*", "", rownames(SEFL_CWFL))
+  SEFL_CWFL <- SEFL_CWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(SEFL_CWFL) <- SEFL_CWFL$locus
+  SEFLCWFL_top <- SEFL_CWFL %>% top_n(n.top, SEFLCWFL)
+  
+  # Combination 15: SEFL - NGM
+  SEFL_NGM <- as.data.frame(freqdiffs[["NGM-SEFL"]])
+  colnames(SEFL_NGM) <- "SEFLNGM"
+  SEFL_NGM$locus <- gsub("\\..*", "", rownames(SEFL_NGM))
+  SEFL_NGM <- SEFL_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(SEFL_NGM) <- SEFL_NGM$locus
+  SEFLNGM_top <- SEFL_NGM %>% top_n(n.top, SEFLNGM)
+  
+  # Combination 16: DRTO - SWFL
+  DRTO_SWFL <- as.data.frame(freqdiffs[["DRTO-SWFL"]])
+  colnames(DRTO_SWFL) <- "DRTOSWFL"
+  DRTO_SWFL$locus <- gsub("\\..*", "", rownames(DRTO_SWFL))
+  DRTO_SWFL <- DRTO_SWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(DRTO_SWFL) <- DRTO_SWFL$locus
+  DRTOSWFL_top <- DRTO_SWFL %>% top_n(n.top, DRTOSWFL)
+  
+  # Combination 17: DRTO - CWFL
+  DRTO_CWFL <- as.data.frame(freqdiffs[["CWFL-DRTO"]])
+  colnames(DRTO_CWFL) <- "DRTOCWFL"
+  DRTO_CWFL$locus <- gsub("\\..*", "", rownames(DRTO_CWFL))
+  DRTO_CWFL <- DRTO_CWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(DRTO_CWFL) <- DRTO_CWFL$locus
+  DRTOCWFL_top <- DRTO_CWFL %>% top_n(n.top, DRTOCWFL)
+  
+  # Combination 18: DRTO - NGM
+  DRTO_NGM <- as.data.frame(freqdiffs[["DRTO-NGM"]])
+  colnames(DRTO_NGM) <- "DRTONGM"
+  DRTO_NGM$locus <- gsub("\\..*", "", rownames(DRTO_NGM))
+  DRTO_NGM <- DRTO_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(DRTO_NGM) <- DRTO_NGM$locus
+  DRTONGM_top <- DRTO_NGM %>% top_n(n.top, DRTONGM)
+  
+  # Combination 19: SWFL - CWFL
+  SWFL_CWFL <- as.data.frame(freqdiffs[["CWFL-SWFL"]])
+  colnames(SWFL_CWFL) <- "SWFLCWFL"
+  SWFL_CWFL$locus <- gsub("\\..*", "", rownames(SWFL_CWFL))
+  SWFL_CWFL <- SWFL_CWFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(SWFL_CWFL) <- SWFL_CWFL$locus
+  SWFLCWFL_top <- SWFL_CWFL %>% top_n(n.top, SWFLCWFL)
+  
+  # Combination 20: SWFL - NGM
+  SWFL_NGM <- as.data.frame(freqdiffs[["NGM-SWFL"]])
+  colnames(SWFL_NGM) <- "SWFLNGM"
+  SWFL_NGM$locus <- gsub("\\..*", "", rownames(SWFL_NGM))
+  SWFL_NGM <- SWFL_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(SWFL_NGM) <- SWFL_NGM$locus
+  SWFLNGM_top <- SWFL_NGM %>% top_n(n.top, SWFLNGM)
+  
+  # Combination 21: CWFL - NGM
+  CWFL_NGM <- as.data.frame(freqdiffs[["CWFL-NGM"]])
+  colnames(CWFL_NGM) <- "CWFLNGM"
+  CWFL_NGM$locus <- gsub("\\..*", "", rownames(CWFL_NGM))
+  CWFL_NGM <- CWFL_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(CWFL_NGM) <- CWFL_NGM$locus
+  CWFLNGM_top <- CWFL_NGM %>% top_n(n.top, CWFLNGM)
+  
+  diff_loci <- NRUCEFL_top%>%
+  full_join(NRUSEFL_top, by = "locus") %>%
+  full_join(NRUDRTO_top, by = "locus") %>%
+  full_join(NRUSWFL_top, by = "locus") %>%
+  full_join(NRUCWFL_top, by = "locus") %>%
+  full_join(NRUNGM_top, by = "locus") %>%
+  full_join(CEFLSEFL_top, by = "locus") %>%
+  full_join(CEFLDRTO_top, by = "locus") %>%
+  full_join(CEFLSWFL_top, by = "locus") %>%
+  full_join(CEFLCWFL_top, by = "locus") %>%
+  full_join(CEFLNGM_top, by = "locus") %>%
+  full_join(SEFLDRTO_top, by = "locus") %>%
+  full_join(SEFLSWFL_top, by = "locus") %>%
+  full_join(SEFLCWFL_top, by = "locus") %>%
+  full_join(SEFLNGM_top, by = "locus") %>%
+  full_join(DRTOSWFL_top, by = "locus") %>%
+  full_join(DRTOCWFL_top, by = "locus") %>%
+  full_join(DRTONGM_top, by = "locus") %>%
+  full_join(SWFLCWFL_top, by = "locus") %>%
+  full_join(SWFLNGM_top, by = "locus") %>%
+  full_join(CWFLNGM_top, by = "locus")
+  diff_loci<-diff_loci[c(2,1,3:22)]
+
+  #Isolate/format outlier locus names for data subsetting
+  outlier_loci <- diff_loci %>% dplyr::select(locus) %>% 
+  distinct(locus)
+  outlier_loci<- as.matrix(outlier_loci)
+
+  genlight_out <-gl.keep.loc(genlight_2, loc.list = outlier_loci, verbose=0)
+  genind_out <- gl2gi(genlight_out, verbose=0)
+  
+  training_genind<- genind_out[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind_out[individual_names]
+  
+  #Run DAPC
+  n.da <- 6 #Set number of DAs
+  dapc <- dapc(training_genind, training_genind@pop, n.pca=60, n.da = n.da, var.contrib = TRUE)
+  
+  set.seed(5)
+  temp_score <- optim.a.score(dapc, plot=FALSE) #Determine best number of PCs to retain for DAPC analysis
+  n.pc <- temp_score$best
+  dapc2 <-dapc(training_genind,training_genind@pop, n.pca = n.pc, n.da = n.da)
+  
+  dapc_pred<-predict.dapc(dapc2, newdata=validation_genind)
+
+  ##Make DF for validation assignments
+  val_assignments<-as.data.frame(dapc_pred$posterior)
+  val_assignments$ind<-rownames(val_assignments)
+  val_assignments$pop<-str_sub(row.names(dapc_pred$ind.scores), 1,2) #assignments$pop<-gsub ("_", "",   assignments$pop)
+  
+  val_assignments$post<-str_sub(colnames(val_assignments[,1:4])[max.col(val_assignments[,1:4],ties.method="first")], 1,2)
+  val_assignments$loci<-top_seq[[l]]
+  
+  datalist[[i]] <- rbind(datalist[[i]], val_assignments)
+  prog<-length(!is.null(datalist))/(length(rand_combs)*length(top_seq))*100
+  
+  print((paste0("Completed assignment using ", top_seq[[l]]," loci for combination ", i," of ", length(rand_combs))))
+
+  }
+}
+
+
+```
+
+```{r MU Visualize LOO+Loci}
+loo_assignments<-dplyr::bind_rows(datalist)
+
+loo_assignments$loci<-as.factor(loo_assignments$loci)
+loo_assignments$correct<-ifelse(loo_assignments$pop==loo_assignments$post, "1", "0")
+
+correct_ass <- prop.table(table(loo_assignments$loci, loo_assignments$correct == "1"), margin = 1)
+correct_ass<-as.data.frame(correct_ass)
+colnames(correct_ass)<-c("Loci","Correct","Proportion")
+
+correct_ass %>%
+  dplyr::filter(Correct=="TRUE")%>%
+  ggplot(aes(x=Loci, y=Proportion))+
+  geom_line()+
+  #geom_vline(xintercept = 25, colour="red", linetype = "longdash")+
+  theme_classic()+
+  ylab("Proportion Correct")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+accuracy<-loo_assignments$pop==loo_assignments$post
+#% Correct
+print(paste0("The assignment accuracy with no likelihood threshold is: ", (length(accuracy[accuracy == TRUE])/length(accuracy))*100))
+
+loo_assignments$post90<-ifelse(rowSums(loo_assignments[, 1:4] > 0.9) > 0, str_sub(colnames(loo_assignments[,1:4])[max.col(loo_assignments[,1:4],ties.method="first")], 1,2),NA)
+
+correct_high_prob_assignments <- sum(!is.na(loo_assignments$post90) & loo_assignments$post90 == loo_assignments$pop)
+
+print(paste0("The assignment accuracy with a 90% likelihood threshold is: ",(correct_high_prob_assignments/(sum(!is.na(loo_assignments$post90)))*100)), "%")
+```
+
+# RUs
+```{r RU popmap and check}
+#Read in the population map. This should be a two-column tab-delimited text file where the first column contains the name of each individual sample and the second column contains the population. This can be the same as the population map used in Stacks.
+popmap.orig <- read_tsv("./data/Combined_sort_RUs_popmap.txt", col_names = F) %>% 
+  dplyr::rename(Indiv = X1, STRATA = X2)
+
+# Filter the population map for whitelisted individuals i.e. those we will keep for the population genetics analysis.
+popmap.filtered <- tibble(Indiv = genlight@ind.names) %>% left_join(popmap.orig, by = "Indiv")
+genlight@pop <- as.factor(popmap.filtered$STRATA)
+summary(genlight@pop)
+
+# Read in a "regions" file. This file should have at a minimum a column for Population, latitude, and longitude. We assume this is a csv (comma-separate) file.
+#region <- read.csv("regions.csv", header = T)
+
+#Tibbles will only show a couple sig digits for lat and long, but the full coordinates are stored.
+#latlon <- as.data.frame(cbind(region$Population,
+#                              region$lat,
+#                              region$lon)) %>% 
+#  dplyr::rename(STRATA = V1, lat = V2, lon = V3) %>% 
+#  mutate(lat = as.numeric(lat), lon = as.numeric(lon))
+
+#Replicate the coordinates for each sample
+#all_latlon <- popmap.filtered %>% left_join(latlon, by = "STRATA") %>% 
+#  dplyr::select(-Indiv)
+
+#latlon <- all_latlon[,2:3]
+#genlight@other$latlon<-latlon
+
+genlight_2 <- gl.compliance.check(genlight)
+
+genind <- gl2gi(genlight_2) # need genind format for some functions
+summary(genlight_2@pop)
+summary(genind@pop)
+```
+
+```{r RU poplist for assignments}
+# Create a list of individuals for each population
+pop_names <- unique(genind$pop)
+indiv_names <- genlight_2@other[["ind.metrics"]][["id"]]
+populations <- lapply(pop_names, function(pop) indiv_names[pop == genind$pop])
+```
+
+```{r RU LOO+Loci Serial}
+# Initialize an empty list to store combinations
+combinations_list <- list()
+
+# Nested loops to iterate through each combination
+for (indiv_pop1 in populations[[1]]) {
+  for (indiv_pop2 in populations[[2]]) {
+    for (indiv_pop3 in populations[[3]]) {
+      for (indiv_pop4 in populations[[4]]) {
+        # Create a list for the current combination
+        current_combination <- list(
+          population1 = indiv_pop1,
+          population2 = indiv_pop2,
+          population3 = indiv_pop3,
+          population4 = indiv_pop4
+        )
+        # Append the current combination to the list of combinations
+        combinations_list <- c(combinations_list, list(current_combination))
+      }
+    }
+  }
+}
+
+n<-1000
+rand_combs <- sample(combinations_list, n, replace = FALSE)
+datalist <- vector("list", length = length(rand_combs))
+top_seq <- seq(from = 10, to = 1000, by = 100)
+loci_list <- vector("list", length = length(top_seq))
+
+# Access and print individual names from a specific combination
+for (i in seq_along(rand_combs)) {
+  current_combination <- rand_combs[[i]]
+  individual_names <- unlist(current_combination)
+  
+  #Subset geninds
+  training_genind<- genind[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind[individual_names]
+  
+  #ID outlier loci
+  genpop<-genind2genpop(training_genind, quiet=TRUE) #change to training_genind for actual loo
+  #Calculate allele frequencies
+  freq<-makefreq(genpop, missing=0, quiet=TRUE)
+  
+  #Calculate allele frequency differences for all pairs of populations
+  freqdiffs<-list()
+  for (j in 1:(nrow(freq) - 1)) {
+    for (k in (j + 1):nrow(freq)) {
+      freqdiffs[[paste(row.names(freq)[j], row.names(freq)[k], sep = '-')]] <- abs(freq[j, ] - freq[k, ])
+   }
+  }
+  as.data.frame(do.call(rbind, freqdiffs))
+  
+for (l in seq_along(top_seq)){
+  
+  n.top<-top_seq[[l]]
+  
+  # Combination 1: PFL - NRU
+  NRU_PFL <- as.data.frame(freqdiffs[["NRU-PFL"]])
+  colnames(NRU_PFL) <- "NRUPFL"
+  NRU_PFL$locus <- gsub("\\..*", "", rownames(NRU_PFL))
+  NRU_PFL <- NRU_PFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_PFL) <- NRU_PFL$locus
+  NRUPFL_top <- NRU_PFL %>% top_n(n.top, NRUPFL)
+  
+  # Combination 2: NRU - DRTO
+  NRU_DRTO <- as.data.frame(freqdiffs[["DRTO-NRU"]])
+  colnames(NRU_DRTO) <- "NRUDRTO"
+  NRU_DRTO$locus <- gsub("\\..*", "", rownames(NRU_DRTO))
+  NRU_DRTO <- NRU_DRTO %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_DRTO) <- NRU_DRTO$locus
+  NRUDRTO_top <- NRU_DRTO %>% top_n(n.top, NRUDRTO)
+  
+  # Combination 3: NRU - NGM
+  NRU_NGM <- as.data.frame(freqdiffs[["NGM-NRU"]])
+  colnames(NRU_NGM) <- "NRUNGM"
+  NRU_NGM$locus <- gsub("\\..*", "", rownames(NRU_NGM))
+  NRU_NGM <- NRU_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(NRU_NGM) <- NRU_NGM$locus
+  NRUNGM_top <- NRU_NGM %>% top_n(n.top, NRUNGM)
+  
+  # Combination 4: DRTO - NGM
+  DRTO_NGM <- as.data.frame(freqdiffs[["DRTO-NGM"]])
+  colnames(DRTO_NGM) <- "DRTONGM"
+  DRTO_NGM$locus <- gsub("\\..*", "", rownames(DRTO_NGM))
+  DRTO_NGM <- DRTO_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(DRTO_NGM) <- DRTO_NGM$locus
+  DRTONGM_top <- DRTO_NGM %>% top_n(n.top, DRTONGM)
+  
+  # Combination 5: DRTO - PFL
+  DRTO_PFL <- as.data.frame(freqdiffs[["DRTO-PFL"]])
+  colnames(DRTO_PFL) <- "DRTOPFL"
+  DRTO_PFL$locus <- gsub("\\..*", "", rownames(DRTO_PFL))
+  DRTO_PFL <- DRTO_PFL %>% distinct(locus, .keep_all = TRUE)
+  rownames(DRTO_PFL) <- DRTO_PFL$locus
+  DRTOPFL_top <- DRTO_PFL %>% top_n(n.top, DRTOPFL)
+  
+  # Combination 6: PFL - NGM
+  PFL_NGM <- as.data.frame(freqdiffs[["NGM-PFL"]])
+  colnames(PFL_NGM) <- "PFLNGM"
+  PFL_NGM$locus <- gsub("\\..*", "", rownames(PFL_NGM))
+  PFL_NGM <- PFL_NGM %>% distinct(locus, .keep_all = TRUE)
+  rownames(PFL_NGM) <- PFL_NGM$locus
+  PFLNGM_top <- PFL_NGM %>% top_n(n.top, PFLNGM)
+  
+  diff_loci <- NRUPFL_top%>%
+  full_join(NRUDRTO_top, by = "locus") %>%
+  full_join(NRUNGM_top, by = "locus") %>%
+  full_join(DRTONGM_top, by = "locus") %>%
+  full_join(DRTOPFL_top, by = "locus") %>%
+  full_join(PFLNGM_top, by = "locus")
+  diff_loci<-diff_loci[c(2,1,3:7)]
+
+  #Isolate/format outlier locus names for data subsetting
+  outlier_loci <- diff_loci %>% dplyr::select(locus) %>% 
+  distinct(locus)
+  outlier_loci<- as.matrix(outlier_loci)
+
+  genlight_out <-gl.keep.loc(genlight_2, loc.list = outlier_loci, verbose=0)
+  genind_out <- gl2gi(genlight_out, verbose=0)
+  
+  training_genind<- genind_out[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind_out[individual_names]
+  
+  #Run DAPC
+  n.da <- 6 #Set number of DAs
+  dapc <- dapc(training_genind, training_genind@pop, n.pca=60, n.da = n.da, var.contrib = TRUE)
+  
+  set.seed(5)
+  temp_score <- optim.a.score(dapc, plot=FALSE) #Determine best number of PCs to retain for DAPC analysis
+  n.pc <- temp_score$best
+  dapc2 <-dapc(training_genind,training_genind@pop, n.pca = n.pc, n.da = n.da)
+  
+  dapc_pred<-predict.dapc(dapc2, newdata=validation_genind)
+
+  ##Make DF for validation assignments
+  val_assignments<-as.data.frame(dapc_pred$posterior)
+  val_assignments$ind<-rownames(val_assignments)
+  
+  
+for (m in 1:length(val_assignments$ind)){
+  if (str_sub(val_assignments$ind[m], 1,2) == "NR"){    
+    val_assignments$pop[m] <- "NR"
+  } 
+  else {
+    if (str_sub(val_assignments$ind[m], 1,2) == "CE" || str_sub(val_assignments$ind[m], 1,2) == "SE"|| str_sub(val_assignments$ind[m], 1,2) == "SW" || str_sub(val_assignments$ind[m], 1,2) == "CW"){
+    val_assignments$pop[m] <- "PF"
+    }
+    else {
+      if (str_sub(val_assignments$ind[m], 1,2) == "DR"){
+      val_assignments$pop[m] <- "DR"
+      }
+      else {
+        if (str_sub(val_assignments$ind[m], 1,2) == "NG"){
+        val_assignments$pop[m] <- "NG"
+        }
+      }
+  }
+  }
+}
+
+  val_assignments$post<-str_sub(colnames(val_assignments[,1:4])[max.col(val_assignments[,1:4],ties.method="first")], 1,2)
+  val_assignments$loci<-top_seq[[l]]
+  
+  datalist[[i]] <- rbind(datalist[[i]], val_assignments)
+  prog<-length(!is.null(datalist))/(length(rand_combs)*length(top_seq))*100
+  
+  print((paste0("Completed assignment using ", top_seq[[l]]," loci for combination ", i," of ", length(rand_combs))))
+
+  }
+}
+
+
+```
+
+```{r RU Visualize LOO+Loci}
+#Create dataframe from run
+loo_assignments<-dplyr::bind_rows(datalist)
+
+#Or read in dataframe after loop finishes on cluster
+loo_assignments <- read.csv("RU_loo_assignments_par_1300-3300_even.csv")
+
+#May need to remake/reformat some columns:
+#Pop
+for (m in 1:length(loo_assignments$ind)){
+  if (str_sub(loo_assignments$ind[m], 1,2) == "NR"){    
+    loo_assignments$pop[m] <- "NR"
+  } 
+  else {
+    if (str_sub(loo_assignments$ind[m], 1,2) == "CE" || str_sub(loo_assignments$ind[m], 1,2) == "SE"|| str_sub(loo_assignments$ind[m], 1,2) == "SW" || str_sub(loo_assignments$ind[m], 1,2) == "CW"){
+    loo_assignments$pop[m] <- "PF"
+    }
+    else {
+      if (str_sub(loo_assignments$ind[m], 1,2) == "DR"){
+      loo_assignments$pop[m] <- "DR"
+      }
+      else {
+        if (str_sub(loo_assignments$ind[m], 1,2) == "NG"){
+        loo_assignments$pop[m] <- "NG"
+        }
+      }
+  }
+  }
+}
+
+#Post
+loo_assignments$post<-str_sub(colnames(loo_assignments[,2:5])[max.col(loo_assignments[,2:5],ties.method="first")], 1,2)
+
+#Loci
+loo_assignments$loci<-as.factor(loo_assignments$loci)
+
+#Correct
+loo_assignments$correct<-ifelse(loo_assignments$pop==loo_assignments$post, "1", "0")
+
+correct_ass <- prop.table(table(loo_assignments$loci, loo_assignments$correct == "1"), margin = 1)
+correct_ass<-as.data.frame(correct_ass)
+colnames(correct_ass)<-c("Loci","Correct","Proportion")
+correct_ass$pop <- "Overall"
+
+#NRU
+loo_assignments_nru <- loo_assignments %>%
+  filter(pop=="NR")
+correct_ass_nru <- prop.table(table(loo_assignments_nru$loci, loo_assignments_nru$correct == "1"), margin = 1)
+correct_ass_nru<-as.data.frame(correct_ass_nru)
+colnames(correct_ass_nru)<-c("Loci","Correct","Proportion")
+correct_ass_nru$pop <- "NRU"
+
+summary_data_nru <- loo_assignments_nru %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_nru$pop<-"NRU"
+
+#PFL
+loo_assignments_pfl <- loo_assignments %>%
+  filter(pop=="PF")
+correct_ass_pfl <- prop.table(table(loo_assignments_pfl$loci, loo_assignments_pfl$correct == "1"), margin = 1)
+correct_ass_pfl<-as.data.frame(correct_ass_pfl)
+colnames(correct_ass_pfl)<-c("Loci","Correct","Proportion")
+correct_ass_pfl$pop <- "PFL"
+
+summary_data_pfl <- loo_assignments_pfl %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_pfl$pop<-"PFL"
+
+#DRTO
+loo_assignments_drto <- loo_assignments %>%
+  filter(pop=="DR")
+correct_ass_drto <- prop.table(table(loo_assignments_drto$loci, loo_assignments_drto$correct == "1"), margin = 1)
+correct_ass_drto<-as.data.frame(correct_ass_drto)
+colnames(correct_ass_drto)<-c("Loci","Correct","Proportion")
+correct_ass_drto$pop <- "DRTO"
+
+summary_data_drto <- loo_assignments_drto %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_drto$pop<-"DRTO"
+
+#NGM
+loo_assignments_ngm <- loo_assignments %>%
+  filter(pop=="NG")
+correct_ass_ngm <- prop.table(table(loo_assignments_ngm$loci, loo_assignments_ngm$correct == "1"), margin = 1)
+correct_ass_ngm<-as.data.frame(correct_ass_ngm)
+colnames(correct_ass_ngm)<-c("Loci","Correct","Proportion")
+correct_ass_ngm$pop <- "NGM"
+
+summary_data_ngm <- loo_assignments_ngm %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_ngm$pop<-"NGM"
+
+#Format assignment and summary dataframes
+correct_ass <- rbind(correct_ass, correct_ass_drto, correct_ass_ngm, correct_ass_nru, correct_ass_pfl)
+correct_ass$pop<-as.factor(correct_ass$pop)
+
+summary<-rbind(summary_data_drto, summary_data_ngm, summary_data_nru, summary_data_pfl)
+summary$post<-as.factor(summary$post)
+summary$pop<-as.factor(summary$pop)
+
+#Plot success
+correct_ass %>%
+  dplyr::filter(Correct=="TRUE")%>%
+  group_by(pop)%>%
+  ggplot(aes(x=Loci, y=Proportion, group=pop, color=pop))+
+  geom_line(linewidth=2)+
+  theme_classic()+
+  ylab("Proportion Correct")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot assignment frequencies facetted by original pop
+summary%>%
+  group_by(post)%>%
+  ggplot(aes(x = loci, y = frequency, group=post, fill=post)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  xlab("Loci") +
+  ylab("Frequency of Post") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  facet_wrap(~pop)
+
+
+accuracy<-loo_assignments$pop==loo_assignments$post
+#% Correct
+print(paste0("The assignment accuracy with no likelihood threshold is: ", (length(accuracy[accuracy == TRUE])/length(accuracy))*100))
+
+loo_assignments$post90<-ifelse(rowSums(loo_assignments[, 1:4] > 0.9) > 0, str_sub(colnames(loo_assignments[,1:4])[max.col(loo_assignments[,1:4],ties.method="first")], 1,2),NA)
+
+correct_high_prob_assignments <- sum(!is.na(loo_assignments$post90) & loo_assignments$post90 == loo_assignments$pop)
+
+print(paste0("The assignment accuracy with a 90% likelihood threshold is: ",(correct_high_prob_assignments/(sum(!is.na(loo_assignments$post90)))*100)), "%")
+```
+
+# Basins
+```{r Basin popmap and check}
+#Read in the population map. This should be a two-column tab-delimited text file where the first column contains the name of each individual sample and the second column contains the population. This can be the same as the population map used in Stacks.
+popmap.orig <- read_tsv("./data/Combined_sort_basins_popmap.txt", col_names = F) %>% 
+  dplyr::rename(Indiv = X1, STRATA = X2)
+
+# Filter the population map for whitelisted individuals i.e. those we will keep for the population genetics analysis.
+popmap.filtered <- tibble(Indiv = genlight@ind.names) %>% left_join(popmap.orig, by = "Indiv")
+genlight@pop <- as.factor(popmap.filtered$STRATA)
+summary(genlight@pop)
+
+# Read in a "regions" file. This file should have at a minimum a column for Population, latitude, and longitude. We assume this is a csv (comma-separate) file.
+#region <- read.csv("regions.csv", header = T)
+
+#Tibbles will only show a couple sig digits for lat and long, but the full coordinates are stored.
+#latlon <- as.data.frame(cbind(region$Population,
+#                              region$lat,
+#                              region$lon)) %>% 
+#  dplyr::rename(STRATA = V1, lat = V2, lon = V3) %>% 
+#  mutate(lat = as.numeric(lat), lon = as.numeric(lon))
+
+#Replicate the coordinates for each sample
+#all_latlon <- popmap.filtered %>% left_join(latlon, by = "STRATA") %>% 
+#  dplyr::select(-Indiv)
+
+#latlon <- all_latlon[,2:3]
+#genlight@other$latlon<-latlon
+
+genlight_2 <- gl.compliance.check(genlight)
+
+genind <- gl2gi(genlight_2) # need genind format for some functions
+summary(genlight_2@pop)
+summary(genind@pop)
+```
+
+```{r Basin poplist for assignments}
+# Create a list of individuals for each population
+pop_names <- unique(genind$pop)
+indiv_names <- genlight_2@other[["ind.metrics"]][["id"]]
+populations <- lapply(pop_names, function(pop) indiv_names[pop == genind$pop])
+```
+
+```{r Basin LOO+Loci Serial}
+# Initialize an empty list to store combinations
+combinations_list <- list()
+
+# Nested loops to iterate through each combination
+for (indiv_pop1 in populations[[1]]) {
+  for (indiv_pop2 in populations[[2]]) {
+        # Create a list for the current combination
+        current_combination <- list(
+          population1 = indiv_pop1,
+          population2 = indiv_pop2
+        )
+        # Append the current combination to the list of combinations
+        combinations_list <- c(combinations_list, list(current_combination))
+      }
+    }
+
+#For Basins, we will do all combinations (~5000)
+datalist = vector("list", length = length(combinations_list))
+top_seq <- seq(from = 10, to = 1100, by = 100)
+loci_list = vector("list", length = length(top_seq))
+
+# Access and print individual names from a specific combination
+for (i in seq_along(combinations_list)) {
+  current_combination <- combinations_list[[i]]
+  individual_names <- unlist(current_combination)
+  
+  #Subset geninds
+  training_genind<- genind[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind[individual_names]
+  
+  #ID outlier loci
+  genpop<-genind2genpop(training_genind, quiet=TRUE) #change to training_genind for actual loo
+  #Calculate allele frequencies
+  freq<-makefreq(genpop, missing=0, quiet=TRUE)
+  
+  #Calculate allele frequency differences for all pairs of populations
+  freqdiffs<-list()
+  for (j in 1:(nrow(freq) - 1)) {
+    for (k in (j + 1):nrow(freq)) {
+      freqdiffs[[paste(row.names(freq)[j], row.names(freq)[k], sep = '-')]] <- abs(freq[j, ] - freq[k, ])
+   }
+  }
+  as.data.frame(do.call(rbind, freqdiffs))
+  
+for (l in seq_along(top_seq)){
+  
+  n.top<-top_seq[[l]]
+  
+  # Combination 1: ATL - GOM
+  ATL_GOM <- as.data.frame(freqdiffs[["ATL-GOM"]])
+  colnames(ATL_GOM) <- "ATLGOM"
+  ATL_GOM$locus <- gsub("\\..*", "", rownames(ATL_GOM))
+  ATL_GOM <- ATL_GOM %>% distinct(locus, .keep_all = TRUE)
+  rownames(ATL_GOM) <- ATL_GOM$locus
+  ATLGOM_top <- ATL_GOM %>% top_n(n.top, ATLGOM)
+  
+  diff_loci <- ATLGOM_top
+  diff_loci<-diff_loci[c(2,1)]
+
+  #Isolate/format outlier locus names for data subsetting
+  outlier_loci <- diff_loci %>% dplyr::select(locus) %>% 
+  distinct(locus)
+  outlier_loci<- as.matrix(outlier_loci)
+
+  genlight_out <-gl.keep.loc(genlight_2, loc.list = outlier_loci, verbose=0)
+  genind_out <- gl2gi(genlight_out, verbose=0)
+  
+  training_genind<- genind_out[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind_out[individual_names]
+  
+  #Run DAPC
+  n.da <- 6 #Set number of DAs
+  dapc <- dapc(training_genind, training_genind@pop, n.pca=60, n.da = n.da, var.contrib = TRUE)
+  
+  set.seed(5)
+  temp_score <- optim.a.score(dapc, plot=FALSE) #Determine best number of PCs to retain for DAPC analysis
+  n.pc <- temp_score$best
+  dapc2 <-dapc(training_genind,training_genind@pop, n.pca = n.pc, n.da = n.da)
+  
+  dapc_pred<-predict.dapc(dapc2, newdata=validation_genind)
+
+  ##Make DF for validation assignments
+  val_assignments<-as.data.frame(dapc_pred$posterior)
+  val_assignments$ind<-rownames(val_assignments)
+  for (m in 1:length(val_assignments$ind)){
+  if (str_sub(val_assignments$ind[m], 1,2) == "NR" || str_sub(val_assignments$ind[m], 1,2) == "CE" || str_sub(val_assignments$ind[m], 1,2) == "SE"){
+    val_assignments$pop[m] <- "ATL"
+  } 
+  else { 
+    if (str_sub(val_assignments$ind[m], 1,2) == "DR" || str_sub(val_assignments$ind[m], 1,2) == "SW" || str_sub(val_assignments$ind[m], 1,2) == "CW" || str_sub(val_assignments$ind[m], 1,2) == "NG"){
+      val_assignments$pop[m] <- "GOM"
+    }
+  }
+}
+  val_assignments$post<-colnames(val_assignments[,1:2])[max.col(val_assignments[,1:2],ties.method="first")]
+  val_assignments$loci<-top_seq[[l]]
+  
+  datalist[[i]] <- rbind(datalist[[i]], val_assignments)
+  prog<-length(!is.null(datalist))/(length(rand_combs)*length(top_seq))*100
+  
+  print((paste0("Completed assignment using ", top_seq[[l]]," loci for combination ", i," of ", length(rand_combs))))
+
+  }
+}
+```
+
+```{r Basins Visualize LOO+Loci}
+#Either create dataframe after loop finishes locally...
+loo_assignments <- dplyr::bind_rows(datalist)
+
+#Or read in dataframe after loop finishes on cluster
+loo_assignments <- read.csv("Basin_loo_assignments_parallel_again.csv") #From 6/13/24 run on HPC
+
+#May need to remake/reformat some columns:
+#Post
+loo_assignments$post<-colnames(loo_assignments[,2:3])[max.col(loo_assignments[,2:3],ties.method="first")]
+
+#Loci
+loo_assignments$loci<-as.factor(loo_assignments$loci)
+
+#Correct
+loo_assignments$correct<-ifelse(loo_assignments$pop==loo_assignments$post, "1", "0")
+
+correct_ass <- prop.table(table(loo_assignments$loci, loo_assignments$correct == "1"), margin = 1)
+correct_ass<-as.data.frame(correct_ass)
+colnames(correct_ass)<-c("Loci","Correct","Proportion")
+correct_ass$pop <- "Overall"
+
+#ATL
+loo_assignments_atl <- loo_assignments %>%
+  filter(pop=="ATL")
+correct_ass_atl <- prop.table(table(loo_assignments_atl$loci, loo_assignments_atl$correct == "1"), margin = 1)
+correct_ass_atl <- as.data.frame(correct_ass_atl)
+colnames(correct_ass_atl)<-c("Loci","Correct","Proportion")
+correct_ass_atl$pop <- "ATL"
+
+summary_data_atl <- loo_assignments_atl %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_atl$pop<-"ATL"
+
+#GOM
+loo_assignments_gom <- loo_assignments %>%
+  filter(pop=="GOM")
+correct_ass_gom <- prop.table(table(loo_assignments_gom$loci, loo_assignments_gom$correct == "1"), margin = 1)
+correct_ass_gom <- as.data.frame(correct_ass_gom)
+colnames(correct_ass_gom)<-c("Loci","Correct","Proportion")
+correct_ass_gom$pop <- "GOM"
+
+summary_data_gom <- loo_assignments_gom %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_gom$pop<-"GOM"
+
+#Format assignment and summary dataframes
+correct_ass_all <- rbind(correct_ass, correct_ass_atl, correct_ass_gom)
+correct_ass_all$pop<-as.factor(correct_ass_all$pop)
+
+summary<-rbind(summary_data_atl, summary_data_gom)
+summary$post<-as.factor(summary$post)
+summary$pop<-as.factor(summary$pop)
+
+#Choose levels to plot:
+loci_zoom <- c("10", "110", "210", "310", "410", "510", "610", "710", "810", "910", "1010", "1110", "1210", "1310", "1410", "1510", "1610", "1710", "1810", "1910", "2010", "2110", "2210", "2310", "2410", "2510", "2610", "2710", "2810", "2910", "3010")
+
+#Plot success
+correct_ass_all %>%
+  dplyr::filter(Correct == "TRUE", Loci %in% loci_zoom) %>%
+  dplyr::mutate(Loci = factor(Loci, levels = loci_zoom)) %>%  
+  group_by(pop)%>%
+  ggplot(aes(x=Loci, y=Proportion, group=pop, color=pop))+
+  geom_line(linewidth=2)+
+  theme_classic()+
+  ylab("Proportion Correct")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot assignment frequencies faceted by original pop
+summary%>%
+  group_by(post)%>%
+  ggplot(aes(x = loci, y = frequency, group=post, fill=post)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  xlab("Loci") +
+  ylab("Frequency of Post") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  facet_wrap(~pop)
+
+accuracy<-loo_assignments$pop==loo_assignments$post
+#% Correct
+print(paste0("The assignment accuracy with no likelihood threshold is: ", (length(accuracy[accuracy == TRUE])/length(accuracy))*100))
+
+loo_assignments$post90<-ifelse(rowSums(loo_assignments[, 1:4] > 0.9) > 0, str_sub(colnames(loo_assignments[,1:4])[max.col(loo_assignments[,1:4],ties.method="first")], 1,2),NA)
+
+correct_high_prob_assignments <- sum(!is.na(loo_assignments$post90) & loo_assignments$post90 == loo_assignments$pop)
+
+print(paste0("The assignment accuracy with a 90% likelihood threshold is: ",(correct_high_prob_assignments/(sum(!is.na(loo_assignments$post90)))*100)), "%")
+```
+
+```{r Basins Loci}
+#Format output from assignment script
+loci <- read.csv("Basin_2-1002_loci_test.csv")
+loci$locus <- as.factor(loci$locus)
+loci$iteration <- as.factor(loci$iteration)
+loci <- loci[2:4]
+colnames(loci)<-c("Locus", "Frequency Difference", "Iteration")
+loci_summary<- loci %>%
+  group_by(`Locus`) %>%
+  summarize(Freq=length(`Locus`),
+            MeanDiff=mean(`Frequency Difference`, na.rm=TRUE),
+            SDDiff=sd(`Frequency Difference`, na.rm=TRUE),
+            MinDiff=min(`Frequency Difference`),
+            MaxDiff=max(`Frequency Difference`))
+
+#Input and visualize locus frequency
+loci<-read.csv("Basin_loci_2-1002.csv")
+loci$FreqAdj <- (loci$Freq)/5382
+ loci %>%
+  ggplot(aes(x=FreqAdj, y=MeanDiff))+
+  geom_point()+
+  theme_classic()
+  
+```
+
+#Basins+NRU
+```{r Basin NRU popmap and check}
+#Read in the population map. This should be a two-column tab-delimited text file where the first column contains the name of each individual sample and the second column contains the population. This can be the same as the population map used in Stacks.
+popmap.orig <- read_tsv("./data/Combined_sort_basins_NRU_popmap.txt", col_names = F) %>% 
+  dplyr::rename(Indiv = X1, STRATA = X2)
+
+# Filter the population map for whitelisted individuals i.e. those we will keep for the population genetics analysis.
+popmap.filtered <- tibble(Indiv = genlight@ind.names) %>% left_join(popmap.orig, by = "Indiv")
+genlight@pop <- as.factor(popmap.filtered$STRATA)
+summary(genlight@pop)
+
+# Read in a "regions" file. This file should have at a minimum a column for Population, latitude, and longitude. We assume this is a csv (comma-separate) file.
+#region <- read.csv("regions.csv", header = T)
+
+#Tibbles will only show a couple sig digits for lat and long, but the full coordinates are stored.
+#latlon <- as.data.frame(cbind(region$Population,
+#                              region$lat,
+#                              region$lon)) %>% 
+#  dplyr::rename(STRATA = V1, lat = V2, lon = V3) %>% 
+#  mutate(lat = as.numeric(lat), lon = as.numeric(lon))
+
+#Replicate the coordinates for each sample
+#all_latlon <- popmap.filtered %>% left_join(latlon, by = "STRATA") %>% 
+#  dplyr::select(-Indiv)
+
+#latlon <- all_latlon[,2:3]
+#genlight@other$latlon<-latlon
+
+#Subset data to even sample sizes
+NRUinds<-genlight_2@ind.names[grep("^NRU", genlight_2@ind.names)]
+ATLinds<-genlight_2@ind.names[grep(c("^(CEFL|SEFL)"), genlight_2@ind.names)]
+GOMinds<-genlight_2@ind.names[grep(c("^(DRTO|SWFL|CWFL|NGM)"), genlight_2@ind.names)]
+
+ATL_final_inds <- sample(ATLinds, 26, replace = FALSE)
+GOM_final_inds <- sample(GOMinds, 26, replace = FALSE)
+
+final_inds<-c(NRUinds, ATL_final_inds, GOM_final_inds)
+
+genlight_2<-gl.keep.ind(genlight_2, ind.list = final_inds)
+
+#Make genind
+genind <- gl2gi(genlight_2) # need genind format for some functions
+
+summary(genlight_2@pop)
+summary(genind@pop)
+```
+
+```{r Basin NRU poplist for assignments}
+# Create a list of individuals for each population
+pop_names <- unique(genind$pop)
+indiv_names <- genlight_2@other[["ind.metrics"]][["id"]]
+populations <- lapply(pop_names, function(pop) indiv_names[pop == genind$pop])
+```
+
+```{r Basin NRU LOO+Loci Serial}
+# Initialize an empty list to store combinations
+combinations_list <- list()
+
+# Nested loops to iterate through each combination
+for (indiv_pop1 in populations[[1]]) {
+  for (indiv_pop2 in populations[[2]]) {
+    for (indiv_pop3 in populations[[3]]) {
+        # Create a list for the current combination
+        current_combination <- list(
+          population1 = indiv_pop1,
+          population2 = indiv_pop2,
+          population3 = indiv_pop3
+        )
+        # Append the current combination to the list of combinations
+        combinations_list <- c(combinations_list, list(current_combination))
+    }
+  }
+}
+
+n<-1000
+rand_combs <- sample(combinations_list, n, replace = FALSE)
+datalist <- vector("list", length = length(rand_combs))
+top_seq <- seq(from = 10, to = 1000, by = 100)
+loci_list <- vector("list", length = length(top_seq))
+
+# Access and print individual names from a specific combination
+for (i in seq_along(rand_combs)) {
+  current_combination <- rand_combs[[i]]
+  individual_names <- unlist(current_combination)
+  
+  #Subset geninds
+  training_genind<- genind[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind[individual_names]
+  
+  #ID outlier loci
+  genpop<-genind2genpop(training_genind, quiet=TRUE) #change to training_genind for actual loo
+  #Calculate allele frequencies
+  freq<-makefreq(genpop, missing=0, quiet=TRUE)
+  
+  #Calculate allele frequency differences for all pairs of populations
+  freqdiffs<-list()
+  for (j in 1:(nrow(freq) - 1)) {
+    for (k in (j + 1):nrow(freq)) {
+      freqdiffs[[paste(row.names(freq)[j], row.names(freq)[k], sep = '-')]] <- abs(freq[j, ] - freq[k, ])
+   }
+  }
+  as.data.frame(do.call(rbind, freqdiffs))
+  
+for (l in seq_along(top_seq)){
+  
+  n.top<-top_seq[[l]]
+  
+ for (l in seq_along(top_seq)){
+
+    n.top<-top_seq[[l]]
+
+    # Combination 1: ATL - GOM
+    ATL_GOM <- as.data.frame(freqdiffs[["ATL-GOM"]])
+    colnames(ATL_GOM) <- "ATLGOM"
+    ATL_GOM$locus <- gsub("\\..*", "", rownames(ATL_GOM))
+    ATL_GOM <- ATL_GOM %>% distinct(locus, .keep_all = TRUE)
+    rownames(ATL_GOM) <- ATL_GOM$locus
+    ATLGOM_top <- ATL_GOM %>% top_n(n.top, ATLGOM)
+
+    # Combination 2: ATL - NRU
+    ATL_NRU <- as.data.frame(freqdiffs[["ATL-NRU"]])
+    colnames(ATL_NRU) <- "ATLNRU"
+    ATL_NRU$locus <- gsub("\\..*", "", rownames(ATL_NRU))
+    ATL_NRU <- ATL_NRU %>% distinct(locus, .keep_all = TRUE)
+    rownames(ATL_NRU) <- ATL_NRU$locus
+    ATLNRU_top <- ATL_NRU %>% top_n(n.top, ATLNRU)
+
+    # Combination 3: GOM - NRU
+    GOM_NRU <- as.data.frame(freqdiffs[["GOM-NRU"]])
+    colnames(GOM_NRU) <- "GOMNRU"
+    GOM_NRU$locus <- gsub("\\..*", "", rownames(GOM_NRU))
+    GOM_NRU <- GOM_NRU %>% distinct(locus, .keep_all = TRUE)
+    rownames(GOM_NRU) <- GOM_NRU$locus
+    GOMNRU_top <- GOM_NRU %>% top_n(n.top, GOMNRU)
+
+    diff_loci <- ATLGOM_top %>%
+      full_join(ATLNRU_top, by = "locus") %>%
+      full_join(GOMNRU_top, by = "locus")
+
+    diff_loci<-diff_loci[c(2,1,3,4)]
+
+  #Isolate/format outlier locus names for data subsetting
+  outlier_loci <- diff_loci %>% dplyr::select(locus) %>% 
+  distinct(locus)
+  outlier_loci<- as.matrix(outlier_loci)
+
+  genlight_out <-gl.keep.loc(genlight_2, loc.list = outlier_loci, verbose=0)
+  genind_out <- gl2gi(genlight_out, verbose=0)
+  
+  training_genind<- genind_out[!row.names(genind@tab) %in% individual_names]
+  validation_genind<-genind_out[individual_names]
+  
+  #Run DAPC
+  n.da <- 6 #Set number of DAs
+  dapc <- dapc(training_genind, training_genind@pop, n.pca=60, n.da = n.da, var.contrib = TRUE)
+  
+  set.seed(5)
+  temp_score <- optim.a.score(dapc, plot=FALSE) #Determine best number of PCs to retain for DAPC analysis
+  n.pc <- temp_score$best
+  dapc2 <-dapc(training_genind,training_genind@pop, n.pca = n.pc, n.da = n.da)
+  
+  dapc_pred<-predict.dapc(dapc2, newdata=validation_genind)
+
+  ##Make DF for validation assignments
+  val_assignments<-as.data.frame(dapc_pred$posterior)
+  val_assignments$ind<-rownames(val_assignments)
+
+ for (m in 1:length(val_assignments$ind)){
+      if (str_sub(val_assignments$ind[m], 1,2) == "NR"){
+        val_assignments$pop[m] <- "NRU"
+      }
+      else {
+        if (str_sub(val_assignments$ind[m], 1,2) == "CE" || str_sub(val_assignments$ind[m], 1,2) == "SE") {
+          val_assignments$pop[m] <- "ATL"
+        }
+        else {
+          if (str_sub(val_assignments$ind[m], 1,2) == "DR"|| str_sub(val_assignments$ind[m], 1,2) == "SW" || str_sub(val_assignments$ind[m], 1,2) == "CW"|| str_sub(val_assignments$ind[m], 1,2) == "NG"){
+            val_assignments$pop[m] <- "GOM"
+          }
+        }
+      }
+    }
+
+    val_assignments$post<-str_sub(colnames(val_assignments[,1:4])[max.col(val_assignments[,1:4],ties.method="first")], 1,2)
+    val_assignments$loci<-top_seq[[l]]
+
+  
+  datalist[[i]] <- rbind(datalist[[i]], val_assignments)
+  prog<-length(!is.null(datalist))/(length(rand_combs)*length(top_seq))*100
+  
+  print((paste0("Completed assignment using ", top_seq[[l]]," loci for combination ", i," of ", length(rand_combs))))
+
+    }
+  }
+}
+```
+
+```{r Basins NRU Visualize LOO+Loci}
+#Either create dataframe after loop finishes locally...
+loo_assignments <- dplyr::bind_rows(datalist)
+
+#Or read in dataframe after loop finishes on cluster
+loo_assignments <- read.csv("Basin_NRU_loo_assignments_parallel_uneven_2-300.csv") #From 6/13/24 run on HPC
+
+#May need to remake/reformat some columns:
+#Post
+loo_assignments$post<-colnames(loo_assignments[,2:4])[max.col(loo_assignments[,2:4],ties.method="first")]
+
+#Loci
+loo_assignments$loci<-as.factor(loo_assignments$loci)
+
+#Correct
+loo_assignments$correct<-ifelse(loo_assignments$pop==loo_assignments$post, "1", "0")
+
+correct_ass <- prop.table(table(loo_assignments$loci, loo_assignments$correct == "1"), margin = 1)
+correct_ass<-as.data.frame(correct_ass)
+colnames(correct_ass)<-c("Loci","Correct","Proportion")
+correct_ass$pop <- "Overall"
+
+#ATL
+loo_assignments_atl <- loo_assignments %>%
+  filter(pop=="ATL")
+correct_ass_atl <- prop.table(table(loo_assignments_atl$loci, loo_assignments_atl$correct == "1"), margin = 1)
+correct_ass_atl <- as.data.frame(correct_ass_atl)
+colnames(correct_ass_atl)<-c("Loci","Correct","Proportion")
+correct_ass_atl$pop <- "ATL"
+
+summary_data_atl <- loo_assignments_atl %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_atl$pop<-"ATL"
+
+#GOM
+loo_assignments_gom <- loo_assignments %>%
+  filter(pop=="GOM")
+correct_ass_gom <- prop.table(table(loo_assignments_gom$loci, loo_assignments_gom$correct == "1"), margin = 1)
+correct_ass_gom <- as.data.frame(correct_ass_gom)
+colnames(correct_ass_gom)<-c("Loci","Correct","Proportion")
+correct_ass_gom$pop <- "GOM"
+
+summary_data_gom <- loo_assignments_gom %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_gom$pop<-"GOM"
+
+#NRU
+loo_assignments_nru <- loo_assignments %>%
+  filter(pop=="NRU")
+correct_ass_nru <- prop.table(table(loo_assignments_nru$loci, loo_assignments_nru$correct == "1"), margin = 1)
+correct_ass_nru <- as.data.frame(correct_ass_nru)
+colnames(correct_ass_nru)<-c("Loci","Correct","Proportion")
+correct_ass_nru$pop <- "NRU"
+
+summary_data_nru <- loo_assignments_nru %>%
+  group_by(loci, post) %>%
+  summarize(frequency = n())
+summary_data_nru$pop<-"NRU"
+
+#Format assignment and summary dataframes
+correct_ass_all <- rbind(correct_ass, correct_ass_atl, correct_ass_gom, correct_ass_nru)
+correct_ass_all$pop<-as.factor(correct_ass_all$pop)
+
+summary<-rbind(summary_data_atl, summary_data_gom, summary_data_nru)
+summary$post<-as.factor(summary$post)
+summary$pop<-as.factor(summary$pop)
+
+#Choose levels to plot:
+loci_zoom <- c("10", "110", "210", "310", "410", "510", "610", "710", "810", "910", "1010", "1110", "1210", "1310", "1410", "1510", "1610", "1710", "1810", "1910", "2010", "2110", "2210", "2310", "2410", "2510", "2610", "2710", "2810", "2910", "3010")
+
+#Plot success
+correct_ass_all %>%
+  dplyr::filter(Correct == "TRUE") %>%   #, Loci %in% loci_zoom) %>%
+  #dplyr::mutate(Loci = factor(Loci, levels = loci_zoom)) %>%  
+  group_by(pop)%>%
+  ggplot(aes(x=Loci, y=Proportion, group=pop, color=pop))+
+  geom_line(linewidth=2)+
+  theme_classic()+
+  ylab("Proportion Correct")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot assignment frequencies faceted by original pop
+summary%>%
+  group_by(post)%>%
+  ggplot(aes(x = loci, y = frequency, group=post, fill=post)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  xlab("Loci") +
+  ylab("Frequency of Post") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  facet_wrap(~pop)
+
+accuracy<-loo_assignments$pop==loo_assignments$post
+#% Correct
+print(paste0("The assignment accuracy with no likelihood threshold is: ", (length(accuracy[accuracy == TRUE])/length(accuracy))*100))
+
+loo_assignments$post90<-ifelse(rowSums(loo_assignments[, 1:4] > 0.9) > 0, str_sub(colnames(loo_assignments[,1:4])[max.col(loo_assignments[,1:4],ties.method="first")], 1,2),NA)
+
+correct_high_prob_assignments <- sum(!is.na(loo_assignments$post90) & loo_assignments$post90 == loo_assignments$pop)
+
+print(paste0("The assignment accuracy with a 90% likelihood threshold is: ",(correct_high_prob_assignments/(sum(!is.na(loo_assignments$post90)))*100)), "%")
+```
