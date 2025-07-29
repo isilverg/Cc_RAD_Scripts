@@ -11,6 +11,6 @@ for K in $( seq 0 $pops )
 
 do
 
-./admixture --cv ccgom.bed $K | tee log${K}.out
+./admixture --cv cc_combined.bed $K | tee log${K}.out
 
 done
