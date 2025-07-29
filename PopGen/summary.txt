@@ -1,0 +1,139 @@
+# This document produced by structureHarvester core version vB.1 July 2022
+# http://www.structureharvester.com/
+# https://github.com/dentearl/structureHarvester/
+# http://taylor0.biology.ucla.edu/structureHarvester
+# http://users.soe.ucsc.edu/~dearl/software/structureHarvester
+# Written by Dent Earl, dearl (a) soe ucsc edu.
+# CITATION:
+# Earl, Dent A. and vonHoldt, Bridgett M. (2012)
+# STRUCTURE HARVESTER: a website and program for visualizing
+# STRUCTURE output and implementing the Evanno method.
+# Conservation Genetics Resources 4(2) 359-361. DOI: 10.1007/s12686-011-9548-7
+# Core version: vB.1 July 2022
+# File generated at 2024-May-03 01:58:45 EDT
+#
+
+##########
+# K	Reps	mean est. LnP(Data)	stdev est. LnP(Data)
+1	10	-2772599.810000	34.121302
+2	10	-2777303.610000	505.838508
+3	10	-2787528.470000	8458.837748
+4	10	-2819408.560000	21643.096221
+5	10	-3123436.930000	122816.087705
+6	10	-4264381.830000	473898.639493
+7	10	-6314208.330000	1401132.515304
+8	10	-9820875.940000	1237393.753957
+9	10	-12543332.620000	2131326.169315
+10	10	-13670161.060000	1273353.590401
+
+##########
+# File name	Run #	K	Est. Ln prob. of data	Mean value of Ln likelihood	Variance of Ln likelihood
+Combined_cut_k4_run8_f		4	-2805341.3	-2758560.1	93562.4
+Combined_cut_k4_run4_f		4	-2797974.6	-2758575.6	78798.1
+Combined_cut_k4_run3_f		4	-2822471.0	-2758442.7	128056.6
+Combined_cut_k4_run9_f		4	-2807699.3	-2758517.5	98363.5
+Combined_cut_k4_run6_f		4	-2815554.5	-2758481.3	114146.3
+Combined_cut_k4_run7_f		4	-2834732.4	-2758421.3	152622.2
+Combined_cut_k4_run5_f		4	-2812137.4	-2758598.6	107077.5
+Combined_cut_k4_run1_f		4	-2874115.8	-2758351.9	231527.7
+Combined_cut_k4_run2_f		4	-2813992.1	-2758513.5	110957.2
+Combined_cut_k4_run10_f		4	-2810067.2	-2758565.5	103003.3
+Combined_cut_k8_run9_f		8	-8396014.0	-2755104.5	11281819.0
+Combined_cut_k8_run5_f		8	-9407984.8	-2755685.6	13304598.5
+Combined_cut_k8_run3_f		8	-9616840.7	-2756746.5	13720188.5
+Combined_cut_k8_run4_f		8	-11033301.8	-2757150.9	16552301.8
+Combined_cut_k8_run1_f		8	-9918006.4	-2756693.0	14322626.8
+Combined_cut_k8_run8_f		8	-9267249.4	-2756144.4	13022210.0
+Combined_cut_k8_run6_f		8	-7989567.2	-2755018.2	10469098.1
+Combined_cut_k8_run7_f		8	-9860154.1	-2756236.7	14207834.8
+Combined_cut_k8_run2_f		8	-10448749.6	-2755992.9	15385513.3
+Combined_cut_k8_run10_f		8	-12270891.4	-2757535.3	19026712.3
+Combined_cut_k9_run10_f		9	-13718632.4	-2757111.6	21923041.5
+Combined_cut_k9_run4_f		9	-13090319.3	-2756129.6	20668379.4
+Combined_cut_k9_run2_f		9	-9170652.5	-2754207.2	12832890.5
+Combined_cut_k9_run9_f		9	-11534554.2	-2756079.2	17556950.0
+Combined_cut_k9_run3_f		9	-15438468.3	-2756262.5	25364411.6
+Combined_cut_k9_run5_f		9	-12012569.7	-2756216.6	18512706.3
+Combined_cut_k9_run8_f		9	-12326609.4	-2755753.6	19141711.6
+Combined_cut_k9_run1_f		9	-14009991.5	-2756376.1	22507230.8
+Combined_cut_k9_run6_f		9	-9282590.7	-2755562.3	13054056.9
+Combined_cut_k9_run7_f		9	-14848938.2	-2760080.2	24177716.0
+Combined_cut_k2_run4_f		2	-2777270.5	-2762444.9	29651.2
+Combined_cut_k2_run6_f		2	-2777314.8	-2762436.2	29757.3
+Combined_cut_k2_run1_f		2	-2778142.9	-2762397.2	31491.3
+Combined_cut_k2_run2_f		2	-2777278.2	-2762418.7	29719.0
+Combined_cut_k2_run5_f		2	-2777514.8	-2762458.8	30111.9
+Combined_cut_k2_run9_f		2	-2776541.1	-2762408.3	28265.8
+Combined_cut_k2_run8_f		2	-2776676.7	-2762443.5	28466.4
+Combined_cut_k2_run3_f		2	-2776893.1	-2762370.6	29045.0
+Combined_cut_k2_run10_f		2	-2777916.0	-2762440.6	30950.9
+Combined_cut_k2_run7_f		2	-2777488.0	-2762446.8	30082.5
+Combined_cut_k10_run3_f		10	-14697771.3	-2756226.2	23883090.3
+Combined_cut_k10_run2_f		10	-13741185.5	-2758064.5	21966242.2
+Combined_cut_k10_run10_f		10	-13368976.9	-2759907.9	21218138.1
+Combined_cut_k10_run4_f		10	-13411540.9	-2755483.8	21312114.2
+Combined_cut_k10_run6_f		10	-13715920.2	-2757473.6	21916893.1
+Combined_cut_k10_run9_f		10	-15536980.8	-2759955.9	25554049.8
+Combined_cut_k10_run8_f		10	-13401053.3	-2756004.5	21290097.5
+Combined_cut_k10_run1_f		10	-10829585.9	-2755262.0	16148647.8
+Combined_cut_k10_run5_f		10	-13124888.8	-2756153.4	20737470.7
+Combined_cut_k10_run7_f		10	-14873707.0	-2759561.4	24228291.2
+Combined_cut_k6_run4_f		6	-4429389.1	-2756475.5	3345827.1
+Combined_cut_k6_run1_f		6	-4311043.9	-2756453.7	3109180.3
+Combined_cut_k6_run10_f		6	-3786093.3	-2756777.4	2058631.9
+Combined_cut_k6_run7_f		6	-4810814.4	-2756299.2	4109030.5
+Combined_cut_k6_run8_f		6	-4386971.5	-2756551.5	3260840.1
+Combined_cut_k6_run9_f		6	-5028943.0	-2756676.1	4544533.8
+Combined_cut_k6_run6_f		6	-3858946.6	-2756673.7	2204545.9
+Combined_cut_k6_run3_f		6	-3630006.3	-2756085.2	1747842.2
+Combined_cut_k6_run2_f		6	-4581587.2	-2756280.0	3650614.4
+Combined_cut_k6_run5_f		6	-3820023.0	-2755952.6	2128140.7
+Combined_cut_k5_run9_f		5	-3019894.4	-2757144.0	525500.8
+Combined_cut_k5_run4_f		5	-2992357.7	-2757324.1	470067.1
+Combined_cut_k5_run2_f		5	-3262706.6	-2756843.7	1011725.9
+Combined_cut_k5_run5_f		5	-3235890.2	-2756968.1	957844.1
+Combined_cut_k5_run8_f		5	-3204651.3	-2757116.1	895070.5
+Combined_cut_k5_run3_f		5	-3065992.9	-2757229.8	617526.3
+Combined_cut_k5_run10_f		5	-2946099.6	-2756972.5	378254.2
+Combined_cut_k5_run6_f		5	-3116096.5	-2757225.8	717741.4
+Combined_cut_k5_run7_f		5	-3305047.4	-2757092.4	1095910.0
+Combined_cut_k5_run1_f		5	-3085632.7	-2757293.8	656677.8
+Combined_cut_k7_run8_f		7	-5930932.8	-2755943.8	6349978.1
+Combined_cut_k7_run9_f		7	-8694573.2	-2756408.1	11876330.3
+Combined_cut_k7_run4_f		7	-5503929.9	-2755758.2	5496343.3
+Combined_cut_k7_run5_f		7	-5729724.9	-2755826.4	5947796.9
+Combined_cut_k7_run10_f		7	-5778732.6	-2755753.1	6045959.0
+Combined_cut_k7_run1_f		7	-8609766.0	-2757561.8	11704408.4
+Combined_cut_k7_run7_f		7	-7238673.8	-2755799.4	8965748.8
+Combined_cut_k7_run3_f		7	-5942565.2	-2756021.2	6373087.9
+Combined_cut_k7_run2_f		7	-4684866.7	-2755432.0	3858869.4
+Combined_cut_k7_run6_f		7	-5028318.2	-2755215.5	4546205.4
+Combined_cut_k1_run3_f		1	-2772612.4	-2765734.1	13756.7
+Combined_cut_k1_run8_f		1	-2772625.1	-2765731.2	13787.8
+Combined_cut_k1_run9_f		1	-2772573.3	-2765733.0	13680.6
+Combined_cut_k1_run10_f		1	-2772590.8	-2765732.0	13717.5
+Combined_cut_k1_run5_f		1	-2772623.3	-2765732.3	13782.1
+Combined_cut_k1_run4_f		1	-2772553.7	-2765730.4	13646.4
+Combined_cut_k1_run1_f		1	-2772650.2	-2765734.3	13831.8
+Combined_cut_k1_run6_f		1	-2772617.8	-2765732.4	13770.8
+Combined_cut_k1_run2_f		1	-2772608.9	-2765732.2	13753.4
+Combined_cut_k1_run7_f		1	-2772542.6	-2765731.4	13622.3
+Combined_cut_k3_run4_f		3	-2782921.6	-2760274.2	45294.8
+Combined_cut_k3_run8_f		3	-2785525.8	-2760251.1	50549.4
+Combined_cut_k3_run2_f		3	-2788849.3	-2760325.4	57048.0
+Combined_cut_k3_run6_f		3	-2799880.4	-2760318.6	79123.8
+Combined_cut_k3_run3_f		3	-2782205.1	-2760230.3	43949.7
+Combined_cut_k3_run1_f		3	-2781586.5	-2760297.2	42578.4
+Combined_cut_k3_run9_f		3	-2782174.9	-2760259.0	43831.7
+Combined_cut_k3_run10_f		3	-2781263.6	-2760377.5	41772.2
+Combined_cut_k3_run5_f		3	-2785247.6	-2760184.0	50127.2
+Combined_cut_k3_run7_f		3	-2805629.9	-2760354.8	90550.3
+
+Software written by Dent Earl while at EEB Dept, UCLA, BME Dept UCSC
+dearl (a) soe ucsc edu
+CITATION:
+Earl, Dent A. and vonHoldt, Bridgett M. (2012)
+STRUCTURE HARVESTER: a website and program for visualizing
+STRUCTURE output and implementing the Evanno method.
+# Conservation Genetics Resources 4(2) 359-361. DOI: 10.1007/s12686-011-9548-7
+Core version: vB.1 July 2022
