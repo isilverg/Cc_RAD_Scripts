@@ -27,4 +27,3 @@ Advanced data file options
 #define PHASED    	 1
 #define MARKOVPHASE 	 0
 #define NOTAMBIGUOUS 	 -999 
-
